@@ -7,15 +7,6 @@
   body { margin: 0; background: #000; color: #0f0; font-family: monospace; }
   #container { position: relative; width: 100%; }
   video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: auto; }
-  #log {
-    position: relative;
-    z-index: 10;
-    background: rgba(0,0,0,0.8);
-    padding: 8px;
-    font-size: 14px;
-    white-space: pre-wrap;
-    min-height: 40px;
-  }
   #modeButtons {
     position: relative;
     z-index: 10;
@@ -40,7 +31,6 @@
 </style>
 </head>
 <body>
-<div id="log">起動中...</div>
 <div id="modeButtons">
   <button class="mode-btn active" data-mode="pitching">投球</button>
   <button class="mode-btn" data-mode="batting">バッティング</button>
@@ -53,12 +43,6 @@
 
 <script type="module">
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
-
-const logEl = document.getElementById("log");
-function log(msg) {
-  logEl.textContent += "\n" + msg;
-  console.log(msg);
-}
 
 const video = document.getElementById("webcam");
 const canvas = document.getElementById("output");
@@ -93,7 +77,6 @@ document.querySelectorAll(".mode-btn").forEach((btn) => {
     currentMode = btn.dataset.mode;
     document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    log("モード変更: " + currentMode);
   });
 });
 
@@ -114,11 +97,9 @@ function calculateLineAngle(a, b) {
 }
 
 async function createPoseLandmarker() {
-  log("MediaPipeの準備を読み込み中...");
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
   );
-  log("骨格検出モデルを読み込み中...");
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath:
@@ -128,13 +109,10 @@ async function createPoseLandmarker() {
     runningMode: "VIDEO",
     numPoses: 1
   });
-  log("モデルの読み込み完了");
 }
 
 async function startCamera() {
-  log("カメラへのアクセスを要求中...");
   const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  log("カメラのアクセス許可OK");
   video.srcObject = stream;
   return new Promise((resolve) => {
     video.onloadedmetadata = () => {
@@ -194,10 +172,8 @@ async function main() {
   try {
     await createPoseLandmarker();
     await startCamera();
-    log("骨格検出を開始します");
     renderLoop();
   } catch (err) {
-    log("エラー発生: " + err.message);
     console.error(err);
   }
 }
