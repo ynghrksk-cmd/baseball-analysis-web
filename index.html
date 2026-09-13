@@ -14,7 +14,7 @@
     padding: 8px;
     font-size: 14px;
     white-space: pre-wrap;
-    min-height: 100px;
+    min-height: 40px;
   }
 </style>
 </head>
@@ -40,6 +40,23 @@ const ctx = canvas.getContext("2d");
 
 let poseLandmarker;
 let lastVideoTime = -1;
+
+// --- 角度計算（Python版のcalculate_angleと同じ考え方） ---
+function calculateAngle(a, b, c) {
+  const radians =
+    Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+  let angle = Math.abs((radians * 180.0) / Math.PI);
+  if (angle > 180.0) angle = 360 - angle;
+  return angle;
+}
+
+// --- 2点を結ぶ線の傾き（Python版のcalculate_line_angleと同じ考え方） ---
+function calculateLineAngle(a, b) {
+  const radians = Math.atan2(b.y - a.y, b.x - a.x);
+  let angle = Math.abs((radians * 180.0) / Math.PI);
+  if (angle > 90) angle = 180 - angle;
+  return angle;
+}
 
 async function createPoseLandmarker() {
   log("MediaPipeの準備を読み込み中...");
@@ -68,7 +85,6 @@ async function startCamera() {
     video.onloadedmetadata = () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      log("カメラの映像サイズ: " + video.videoWidth + "x" + video.videoHeight);
       resolve();
     };
   });
@@ -78,9 +94,37 @@ function drawResults(result) {
   ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const drawingUtils = new DrawingUtils(ctx);
+
   for (const landmarks of result.landmarks) {
     drawingUtils.drawLandmarks(landmarks, { radius: 3 });
     drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS);
+
+    // --- 各種角度を計算（Python版と同じ関節番号） ---
+    const rightKnee = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+    const leftKnee = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+    const rightElbow = calculateAngle(landmarks[12], landmarks[14], landmarks[16]);
+    const leftElbow = calculateAngle(landmarks[11], landmarks[13], landmarks[15]);
+    const hipRotation = calculateLineAngle(landmarks[23], landmarks[24]);
+    const shoulderRotation = calculateLineAngle(landmarks[11], landmarks[12]);
+    const separation = Math.abs(shoulderRotation - hipRotation);
+    const hipCenterX = (landmarks[23].x + landmarks[24].x) / 2;
+
+    // --- 画面に数値を表示 ---
+    ctx.font = "20px monospace";
+    ctx.fillStyle = "#00ff00";
+    const lines = [
+      `Right Knee: ${rightKnee.toFixed(0)}`,
+      `Left Knee: ${leftKnee.toFixed(0)}`,
+      `Right Elbow: ${rightElbow.toFixed(0)}`,
+      `Left Elbow: ${leftElbow.toFixed(0)}`,
+      `Hip Rotation: ${hipRotation.toFixed(0)}`,
+      `Shoulder Rotation: ${shoulderRotation.toFixed(0)}`,
+      `Separation: ${separation.toFixed(0)}`,
+      `Hip Center X: ${hipCenterX.toFixed(2)}`
+    ];
+    lines.forEach((text, i) => {
+      ctx.fillText(text, 10, 30 + i * 26);
+    });
   }
   ctx.restore();
 }
