@@ -145,15 +145,19 @@ function drawResults(result) {
 
     const activeFields = MODE_FIELDS[currentMode];
 
-    ctx.font = "20px monospace";
-    ctx.fillStyle = "#00ff00";
+    ctx.font = "bold 32px monospace";
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#000000";
+    ctx.fillStyle = "#ffffff";
     activeFields.forEach((field, i) => {
       const value = allValues[field];
       const text =
         field === "hipCenterX"
           ? `${FIELD_LABELS[field]}: ${value.toFixed(2)}`
           : `${FIELD_LABELS[field]}: ${value.toFixed(0)}`;
-      ctx.fillText(text, 10, 30 + i * 26);
+      const y = 40 + i * 42;
+      ctx.strokeText(text, 10, y);
+      ctx.fillText(text, 10, y);
     });
   }
   ctx.restore();
