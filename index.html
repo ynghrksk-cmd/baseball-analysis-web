@@ -16,10 +16,36 @@
     white-space: pre-wrap;
     min-height: 40px;
   }
+  #modeButtons {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.8);
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 14px 0;
+    font-size: 16px;
+    font-family: monospace;
+    border: 2px solid #0f0;
+    background: #111;
+    color: #0f0;
+  }
+  .mode-btn.active {
+    background: #0f0;
+    color: #000;
+  }
 </style>
 </head>
 <body>
 <div id="log">起動中...</div>
+<div id="modeButtons">
+  <button class="mode-btn active" data-mode="pitching">投球</button>
+  <button class="mode-btn" data-mode="batting">バッティング</button>
+  <button class="mode-btn" data-mode="fielding">守備</button>
+</div>
 <div id="container">
   <video id="webcam" autoplay playsinline muted></video>
   <canvas id="output"></canvas>
@@ -41,7 +67,37 @@ const ctx = canvas.getContext("2d");
 let poseLandmarker;
 let lastVideoTime = -1;
 
-// --- 角度計算（Python版のcalculate_angleと同じ考え方） ---
+// --- モード管理 ---
+let currentMode = "pitching";
+
+const MODE_FIELDS = {
+  pitching: ["rightElbow", "leftElbow", "hipRotation", "shoulderRotation", "separation", "hipCenterX"],
+  batting: ["hipRotation", "shoulderRotation", "separation", "hipCenterX", "rightElbow", "leftElbow"],
+  fielding: ["rightKnee", "leftKnee", "hipCenterX"]
+};
+
+const FIELD_LABELS = {
+  rightKnee: "Right Knee",
+  leftKnee: "Left Knee",
+  rightElbow: "Right Elbow",
+  leftElbow: "Left Elbow",
+  hipRotation: "Hip Rotation",
+  shoulderRotation: "Shoulder Rotation",
+  separation: "Separation",
+  hipCenterX: "Hip Center X"
+};
+
+// --- モードボタンの処理 ---
+document.querySelectorAll(".mode-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    log("モード変更: " + currentMode);
+  });
+});
+
+// --- 角度計算 ---
 function calculateAngle(a, b, c) {
   const radians =
     Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -50,7 +106,6 @@ function calculateAngle(a, b, c) {
   return angle;
 }
 
-// --- 2点を結ぶ線の傾き（Python版のcalculate_line_angleと同じ考え方） ---
 function calculateLineAngle(a, b) {
   const radians = Math.atan2(b.y - a.y, b.x - a.x);
   let angle = Math.abs((radians * 180.0) / Math.PI);
@@ -99,30 +154,27 @@ function drawResults(result) {
     drawingUtils.drawLandmarks(landmarks, { radius: 3 });
     drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS);
 
-    // --- 各種角度を計算（Python版と同じ関節番号） ---
-    const rightKnee = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
-    const leftKnee = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
-    const rightElbow = calculateAngle(landmarks[12], landmarks[14], landmarks[16]);
-    const leftElbow = calculateAngle(landmarks[11], landmarks[13], landmarks[15]);
-    const hipRotation = calculateLineAngle(landmarks[23], landmarks[24]);
-    const shoulderRotation = calculateLineAngle(landmarks[11], landmarks[12]);
-    const separation = Math.abs(shoulderRotation - hipRotation);
-    const hipCenterX = (landmarks[23].x + landmarks[24].x) / 2;
+    const allValues = {
+      rightKnee: calculateAngle(landmarks[24], landmarks[26], landmarks[28]),
+      leftKnee: calculateAngle(landmarks[23], landmarks[25], landmarks[27]),
+      rightElbow: calculateAngle(landmarks[12], landmarks[14], landmarks[16]),
+      leftElbow: calculateAngle(landmarks[11], landmarks[13], landmarks[15]),
+      hipRotation: calculateLineAngle(landmarks[23], landmarks[24]),
+      shoulderRotation: calculateLineAngle(landmarks[11], landmarks[12])
+    };
+    allValues.separation = Math.abs(allValues.shoulderRotation - allValues.hipRotation);
+    allValues.hipCenterX = (landmarks[23].x + landmarks[24].x) / 2;
 
-    // --- 画面に数値を表示 ---
+    const activeFields = MODE_FIELDS[currentMode];
+
     ctx.font = "20px monospace";
     ctx.fillStyle = "#00ff00";
-    const lines = [
-      `Right Knee: ${rightKnee.toFixed(0)}`,
-      `Left Knee: ${leftKnee.toFixed(0)}`,
-      `Right Elbow: ${rightElbow.toFixed(0)}`,
-      `Left Elbow: ${leftElbow.toFixed(0)}`,
-      `Hip Rotation: ${hipRotation.toFixed(0)}`,
-      `Shoulder Rotation: ${shoulderRotation.toFixed(0)}`,
-      `Separation: ${separation.toFixed(0)}`,
-      `Hip Center X: ${hipCenterX.toFixed(2)}`
-    ];
-    lines.forEach((text, i) => {
+    activeFields.forEach((field, i) => {
+      const value = allValues[field];
+      const text =
+        field === "hipCenterX"
+          ? `${FIELD_LABELS[field]}: ${value.toFixed(2)}`
+          : `${FIELD_LABELS[field]}: ${value.toFixed(0)}`;
       ctx.fillText(text, 10, 30 + i * 26);
     });
   }
