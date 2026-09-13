@@ -71,6 +71,21 @@ const FIELD_LABELS = {
   hipCenterX: "Hip Center X"
 };
 
+// --- 一流選手の目安（研究データに基づく参考範囲） ---
+// 参考: 着地時の肘は約90±15度、肩と腰の分離角度は投球で40〜70度、
+// バッティングを含む一流選手全般では30〜55度程度が目安とされる
+const REFERENCE_RANGES = {
+  pitching: {
+    rightElbow: [75, 105],
+    leftElbow: [75, 105],
+    separation: [40, 70]
+  },
+  batting: {
+    separation: [30, 55]
+  },
+  fielding: {}
+};
+
 // --- モードボタンの処理 ---
 document.querySelectorAll(".mode-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -144,18 +159,30 @@ function drawResults(result) {
     allValues.hipCenterX = (landmarks[23].x + landmarks[24].x) / 2;
 
     const activeFields = MODE_FIELDS[currentMode];
+    const ranges = REFERENCE_RANGES[currentMode];
 
-    ctx.font = "bold 32px monospace";
+    ctx.font = "bold 30px monospace";
     ctx.lineWidth = 6;
     ctx.strokeStyle = "#000000";
-    ctx.fillStyle = "#ffffff";
+
     activeFields.forEach((field, i) => {
       const value = allValues[field];
-      const text =
-        field === "hipCenterX"
-          ? `${FIELD_LABELS[field]}: ${value.toFixed(2)}`
-          : `${FIELD_LABELS[field]}: ${value.toFixed(0)}`;
-      const y = 40 + i * 42;
+      const valueText =
+        field === "hipCenterX" ? value.toFixed(2) : value.toFixed(0);
+
+      let text = `${FIELD_LABELS[field]}: ${valueText}`;
+      let color = "#ffffff";
+
+      const range = ranges[field];
+      if (range) {
+        const [min, max] = range;
+        const inRange = value >= min && value <= max;
+        color = inRange ? "#ffffff" : "#ffdd00";
+        text += `  (目安${min}-${max})`;
+      }
+
+      const y = 38 + i * 40;
+      ctx.fillStyle = color;
       ctx.strokeText(text, 10, y);
       ctx.fillText(text, 10, y);
     });
